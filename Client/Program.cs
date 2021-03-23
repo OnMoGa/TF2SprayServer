@@ -1,26 +1,16 @@
 ﻿using System;
+using System.Collections.Specialized;
 using System.Configuration;
 using System.IO;
+using System.Security.Permissions;
 using SprayServerCommon;
+using Microsoft.Win32;
 
 namespace Client {
 	class Program {
 		static void Main(string[] args) {
 
-			var config = ConfigurationManager.AppSettings;
-
-			DirectoryInfo saveDirectory = null;
-			try {
-				saveDirectory = new DirectoryInfo(config["SprayLocation"]);
-				if (!saveDirectory.Exists) {
-					Tools.logError($"Invalid Config Value: Spray Location doesn't exist");
-					Environment.Exit(1);
-				}
-			} catch (ArgumentException e) {
-				Tools.logError($"Invalid Config Value: Spray Location");
-				Environment.Exit(2);
-			}
-
+			NameValueCollection config = ConfigurationManager.AppSettings;
 			Uri serverUri = null;
 			try {
 				serverUri = new Uri(config["Server"]);
@@ -29,7 +19,9 @@ namespace Client {
 				Environment.Exit(3);
 			}
 
-
+			SteamHelper steamHelper = new SteamHelper();
+			DirectoryInfo saveDirectory = new DirectoryInfo(Path.Combine(steamHelper.getAppInstallDirectory(440).FullName, "tf", "materials", "temp"));
+			
 			SyncEngine syncEngine = new SyncEngine(saveDirectory, serverUri);
 			syncEngine.start();
 
