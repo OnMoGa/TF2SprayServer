@@ -12,18 +12,34 @@ namespace Client {
 	class SyncEngine {
 
 
+		private int refreshMilliseconds;
 		private HttpClient client = new HttpClient();
 		private SprayManager sprayManager;
 
 		private Uri baseUri;
 
-		public SyncEngine(DirectoryInfo sprayCache, Uri uri) {
+		public SyncEngine(DirectoryInfo sprayCache, Uri uri, int refreshMilliseconds) {
+			this.refreshMilliseconds = Math.Max(refreshMilliseconds, 5000);
 			this.baseUri = uri;
 			sprayManager = new SprayManager(sprayCache);
 		}
 
 
 		public void start() {
+
+			int serverVersion = getServerVersion();
+			Tools.log($"Client Version: {Program.Version}. Server Version: {serverVersion}.");
+			if (serverVersion > Program.Version) {
+				Tools.logError($"Outdated client version. Got v{Program.Version}, need v{serverVersion}. Please get the updated version from here https://github.com/OnMoGa/TF2SprayServer/releases");
+				Console.ReadLine();
+				Environment.Exit(3);
+			}
+
+
+			var serverConfig = getServerConfig();
+			Tools.log("Got server config");
+			int serverMinRefreshMillis = serverConfig.Value<int>("MinimumRefreshMilliseconds");
+
 			while (true) {
 				sprayManager.reloadSprays();
 
@@ -46,7 +62,7 @@ namespace Client {
 
 				}
 				
-				Thread.Sleep(5000);
+				Thread.Sleep(Math.Max(refreshMilliseconds, serverMinRefreshMillis));
 			}
 		}
 
@@ -68,7 +84,9 @@ namespace Client {
 					}
 
 					if (!response.IsSuccessStatusCode) {
-
+						Tools.logError($"Error making api call. Retrying...");
+						Thread.Sleep(2000);
+						continue;
 					}
 					return response;
 				} catch (Exception e) {
@@ -83,8 +101,8 @@ namespace Client {
 			var response = makeApiCall(HttpMethod.Get, "CollectionHash");
 
 			var responseString = response.Content.ReadAsStringAsync().Result;
-			JObject responseObject = JObject.Parse(responseString);
-			if (response.StatusCode == HttpStatusCode.OK) {
+			if (response.IsSuccessStatusCode) {
+				JObject responseObject = JObject.Parse(responseString);
 				var hash = responseObject.Value<int>("hash");
 				return hash;
 			}
@@ -101,8 +119,7 @@ namespace Client {
 
 			if (response.IsSuccessStatusCode) {
 				var bytes = response.Content.ReadAsByteArrayAsync().Result;
-				sprayManager.addSpray(fileName + ".vtf", bytes);
-				Tools.log($"Downloaded {fileName}");
+				sprayManager.addSpray(fileName, bytes);
 				return;
 			}
 			
@@ -130,18 +147,40 @@ namespace Client {
 		}
 
 
-		public List<string> getServerSprayList() {
+		private List<string> getServerSprayList() {
 			
 			var response = makeApiCall(HttpMethod.Get, "Hashes");
 
 			var responseString = response.Content.ReadAsStringAsync().Result;
-			JObject responseObject = JObject.Parse(responseString);
-			if (response.StatusCode == HttpStatusCode.OK) {
+			if (response.IsSuccessStatusCode) {
+				JObject responseObject = JObject.Parse(responseString);
 				var hashes = responseObject["hashes"].Children();
 				return hashes.Select(h => h.Value<string>()).ToList();
 			}
 			
 			return null;
+		}
+
+
+		private JObject getServerConfig() {
+			var response = makeApiCall(HttpMethod.Get, "Config");
+
+			var responseString = response.Content.ReadAsStringAsync().Result;
+			if (response.IsSuccessStatusCode) {
+				JObject responseObject = JObject.Parse(responseString);
+				return responseObject;
+			}
+			throw new Exception("Failed to fetch server config. Exiting.");
+		}
+
+		private int getServerVersion() {
+			var response = makeApiCall(HttpMethod.Get, $"Version");
+			var responseString = response.Content.ReadAsStringAsync().Result;
+			if (response.IsSuccessStatusCode) {
+				JObject responseObject = JObject.Parse(responseString);
+				return responseObject.Value<int>("Version");
+			}
+			throw new Exception("Failed to fetch server version. Exiting.");
 		}
 
 

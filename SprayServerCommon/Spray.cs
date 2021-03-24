@@ -7,7 +7,7 @@ using System.Linq;
 namespace SprayServerCommon {
 	public class Spray {
 		public FileInfo fileInfo { get; set; }
-		public string name => fileInfo.Name.Split('.').First();
+		public string name => fileInfo.Name;
 		public byte[] data {
 			get {
 				if (fileInfo == null) return null;

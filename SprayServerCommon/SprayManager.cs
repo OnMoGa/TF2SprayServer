@@ -24,9 +24,9 @@ namespace SprayServerCommon {
 
 
 		public void reloadSprays() => loadSprays(saveDirectory);
-		public void loadSprays(DirectoryInfo directory) {
-			
-			Directory.CreateDirectory(saveDirectory.FullName);
+		private void loadSprays(DirectoryInfo directory) {
+			if(!saveDirectory.Exists) Directory.CreateDirectory(saveDirectory.FullName);
+
 			List<FileInfo> files = directory.GetFiles().Where(f => f.isValidSpray()).ToList();
 
 			List<Spray> sprays = files.Select(f => new Spray() {
