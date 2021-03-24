@@ -18,8 +18,12 @@ namespace SprayServerCommon {
 			Spray spray = new Spray();
 			spray.fileInfo = new FileInfo(Path.Combine(saveDirectory.FullName, fileName));
 			spray.data = bytes;
-			sprays.Add(spray);
-			Tools.log($"{fileName} saved");
+			if (spray.fileInfo.isVtf()) {
+				sprays.Add(spray);
+				Tools.log($"{fileName} saved");
+			} else {
+				Tools.logError($"File {spray.fileInfo.FullName} is not a valid spray. Not saving.");
+			}
 		}
 
 
@@ -27,14 +31,21 @@ namespace SprayServerCommon {
 		private void loadSprays(DirectoryInfo directory) {
 			if(!saveDirectory.Exists) Directory.CreateDirectory(saveDirectory.FullName);
 
-			List<FileInfo> files = directory.GetFiles().Where(f => f.isValidSpray()).ToList();
+			List<FileInfo> files = directory.GetFiles().Where(f => f.hasValidExtension()).ToList();
+
+			List<FileInfo> validVtfFiles = files.Where(f => f.isVtf()).ToList();
+
+			foreach (FileInfo invalidVtf in files.Except(validVtfFiles)) {
+				Tools.logError($"File {invalidVtf.FullName} is not a valid spray. You should remove it.");
+			}
+
 
 			List<Spray> sprays = files.Select(f => new Spray() {
 				fileInfo = f
 			}).ToList();
 
 			if (this.sprays == null || !this.sprays.SequenceEqual(sprays)) {
-				Tools.log("Loading Sprays");
+				Tools.log("(Re)Loaded Sprays");
 				this.sprays = sprays;
 			}
 
